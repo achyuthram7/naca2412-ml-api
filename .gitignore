@@ -1,0 +1,31 @@
+# Fluent/Ansys large files
+*.cas.h5
+*.dat.h5
+*.msh
+*.mshdb
+*.dat
+*.trn
+*.bat
+*.ip
+*.set
+*.scdocx
+
+# Workbench project files (large, not needed)
+2D_airfoil_NACA2412li_files/
+2D_airfoil_NACA2412li.wbpj
+Airfoil_domain.scdocx
+
+# Individual run result folders (large)
+results/run_*/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+*.ipynb
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+env/

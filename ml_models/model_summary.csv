@@ -1,0 +1,5 @@
+target,best_model,cv_r2,train_r2,train_mae,train_rmse
+Cl,GradientBoosting,0.9997,1.0,0.000134,0.000163
+Cd,GradientBoosting,0.9998,1.0,2.1e-05,2.7e-05
+Cp,GradientBoosting,0.9906,1.0,2.1e-05,2.8e-05
+wall_shear_stress,GaussianProcess,1.0,1.0,0.000749,0.001183
