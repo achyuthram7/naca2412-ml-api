@@ -1,5 +1,0 @@
-cd D:\Ansys_works
-
-git add .
-git commit -m "describe what you changed"
-git push
