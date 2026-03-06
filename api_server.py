@@ -486,3 +486,7 @@ def health():
         "cfd_rows"    : len(cfd_df) if cfd_df is not None else 0,
         "groq"        : "configured" if os.environ.get("GROQ_API_KEY") else "missing API key"
     }
+@app.get("/ui")
+def chat_ui():
+    html_path = os.path.join(BASE_DIR, "index.html")
+    return FileResponse(html_path)
