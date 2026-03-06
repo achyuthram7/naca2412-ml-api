@@ -436,8 +436,17 @@ async def chat(req: ChatRequest):
 
                 for tc in msg.tool_calls:
                     tool_name  = tc.function.name
-                    tool_input = json.loads(tc.function.arguments)
                     tools_used.append(tool_name)
+
+                    # Safely parse arguments — handle None or empty
+                    try:
+                        tool_input = json.loads(tc.function.arguments) if tc.function.arguments else {}
+                    except Exception:
+                        tool_input = {}
+
+                    # Ensure it's a dict not None
+                    if not isinstance(tool_input, dict):
+                        tool_input = {}
 
                     fn     = TOOL_FUNCTIONS.get(tool_name)
                     result = fn(**tool_input) if fn else {"error": f"Unknown tool: {tool_name}"}
