@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NACA 2412 Aerodynamics Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1e3a5f, #2563eb);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+        }
+        .header-icon { font-size: 28px; }
+        .header-title { font-size: 20px; font-weight: 700; }
+        .header-sub { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #22c55e; margin-left: auto;
+            box-shadow: 0 0 8px #22c55e;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+        /* Chat area */
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Welcome message */
+        .welcome {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+        }
+        .welcome h2 { color: #60a5fa; margin-bottom: 8px; }
+        .welcome p { color: #94a3b8; font-size: 14px; margin-bottom: 16px; }
+        .examples {
+            display: flex; flex-wrap: wrap;
+            gap: 8px; justify-content: center;
+        }
+        .example-btn {
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: #60a5fa;
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .example-btn:hover {
+            background: #1e3a5f;
+            border-color: #2563eb;
+        }
+
+        /* Messages */
+        .message {
+            display: flex;
+            gap: 10px;
+            max-width: 85%;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+        .message.user { align-self: flex-end; flex-direction: row-reverse; }
+        .message.assistant { align-self: flex-start; }
+
+        .avatar {
+            width: 32px; height: 32px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; flex-shrink: 0;
+        }
+        .user .avatar { background: #2563eb; }
+        .assistant .avatar { background: #1e293b; border: 1px solid #334155; }
+
+        .bubble {
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .user .bubble {
+            background: #2563eb;
+            color: white;
+            border-radius: 16px 16px 4px 16px;
+        }
+        .assistant .bubble {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #e2e8f0;
+            border-radius: 16px 16px 16px 4px;
+        }
+
+        /* Tools badge */
+        .tools-used {
+            display: flex; gap: 4px; flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        .tool-badge {
+            background: #0f172a;
+            border: 1px solid #2563eb;
+            color: #60a5fa;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+        }
+
+        /* Data table */
+        .data-table {
+            margin-top: 10px;
+            background: #0f172a;
+            border-radius: 8px;
+            overflow: hidden;
+            font-size: 12px;
+        }
+        .data-table table {
+            width: 100%; border-collapse: collapse;
+        }
+        .data-table th {
+            background: #1e3a5f;
+            padding: 6px 10px;
+            text-align: left;
+            color: #60a5fa;
+        }
+        .data-table td {
+            padding: 5px 10px;
+            border-bottom: 1px solid #1e293b;
+            color: #cbd5e1;
+        }
+
+        /* Typing indicator */
+        .typing {
+            display: flex; gap: 4px;
+            align-items: center; padding: 12px 16px;
+        }
+        .typing span {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #60a5fa; animation: bounce 1s infinite;
+        }
+        .typing span:nth-child(2) { animation-delay: 0.15s; }
+        .typing span:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+        /* Input area */
+        .input-area {
+            padding: 16px 24px;
+            background: #1e293b;
+            border-top: 1px solid #334155;
+        }
+        .input-row {
+            display: flex; gap: 8px; align-items: flex-end;
+            background: #0f172a;
+            border: 1.5px solid #334155;
+            border-radius: 24px;
+            padding: 8px 8px 8px 16px;
+            transition: border-color 0.2s;
+        }
+        .input-row:focus-within { border-color: #2563eb; }
+
+        textarea {
+            flex: 1; background: none; border: none; outline: none;
+            color: #e2e8f0; font-size: 14px; resize: none;
+            max-height: 120px; font-family: inherit;
+            line-height: 1.5; padding: 4px 0;
+        }
+        textarea::placeholder { color: #475569; }
+
+        .send-btn {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: #2563eb; border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 16px; flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .send-btn:hover { background: #1d4ed8; transform: scale(1.05); }
+        .send-btn:disabled { background: #334155; cursor: not-allowed; transform: none; }
+
+        .input-hint {
+            text-align: center; font-size: 11px;
+            color: #475569; margin-top: 8px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <div class="header-icon">✈</div>
+    <div>
+        <div class="header-title">NACA 2412 Aerodynamics Assistant</div>
+        <div class="header-sub">Powered by CFD + ML Surrogate Model + Groq AI</div>
+    </div>
+    <div class="status-dot" title="API Online"></div>
+</div>
+
+<!-- Chat area -->
+<div class="chat-area" id="chatArea">
+    <div class="welcome">
+        <h2>✈ Welcome to NACA 2412 Assistant</h2>
+        <p>Ask me anything about NACA 2412 airfoil aerodynamics in plain English.<br>
+           I use a real CFD-trained ML model to give you accurate predictions!</p>
+        <div class="examples" id="examples">
+            <button class="example-btn" onclick="useExample(this)">What is Cl at 30 m/s and 7 degrees?</button>
+            <button class="example-btn" onclick="useExample(this)">Show Cl vs AoA at 40 m/s</button>
+            <button class="example-btn" onclick="useExample(this)">Compare ML with CFD at 20 m/s, 5°</button>
+            <button class="example-btn" onclick="useExample(this)">What is the stall angle?</button>
+            <button class="example-btn" onclick="useExample(this)">How accurate is the ML model?</button>
+            <button class="example-btn" onclick="useExample(this)">Explain wall shear stress</button>
+            <button class="example-btn" onclick="useExample(this)">What turbulence model was used?</button>
+            <button class="example-btn" onclick="useExample(this)">What is the L/D ratio at 30 m/s, 5°?</button>
+        </div>
+    </div>
+</div>
+
+<!-- Input area -->
+<div class="input-area">
+    <div class="input-row">
+        <textarea
+            id="userInput"
+            placeholder="Ask anything about NACA 2412 aerodynamics..."
+            rows="1"
+            onkeydown="handleKey(event)"
+            oninput="autoResize(this)"
+        ></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Send">
+            ➤
+        </button>
+    </div>
+    <div class="input-hint">Press Enter to send · Shift+Enter for new line</div>
+</div>
+
+<script>
+    // ── Config ────────────────────────────────────────────────────────────────
+    const API_URL = "https://naca2412-ml-api.onrender.com/chat";
+    let history   = [];
+    let isLoading = false;
+
+    // ── Auto resize textarea ──────────────────────────────────────────────────
+    function autoResize(el) {
+        el.style.height = "auto";
+        el.style.height = Math.min(el.scrollHeight, 120) + "px";
+    }
+
+    // ── Handle Enter key ──────────────────────────────────────────────────────
+    function handleKey(e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    }
+
+    // ── Use example question ──────────────────────────────────────────────────
+    function useExample(btn) {
+        document.getElementById("userInput").value = btn.textContent;
+        sendMessage();
+    }
+
+    // ── Add message to chat ───────────────────────────────────────────────────
+    function addMessage(role, content, toolsUsed = [], data = null) {
+        const chatArea = document.getElementById("chatArea");
+
+        const msg = document.createElement("div");
+        msg.className = `message ${role}`;
+
+        const avatar = document.createElement("div");
+        avatar.className = "avatar";
+        avatar.textContent = role === "user" ? "👤" : "🤖";
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.innerHTML = formatMessage(content);
+
+        // Show tools used
+        if (toolsUsed.length > 0) {
+            const toolsDiv = document.createElement("div");
+            toolsDiv.className = "tools-used";
+            toolsUsed.forEach(tool => {
+                const badge = document.createElement("span");
+                badge.className = "tool-badge";
+                badge.textContent = "🔧 " + tool.replace(/_/g, " ");
+                toolsDiv.appendChild(badge);
+            });
+            bubble.appendChild(toolsDiv);
+        }
+
+        // Show data table if prediction data exists
+        if (data && data.ml_predict) {
+            const d = data.ml_predict;
+            const tableDiv = document.createElement("div");
+            tableDiv.className = "data-table";
+            tableDiv.innerHTML = `
+                <table>
+                    <tr><th>Parameter</th><th>Value</th></tr>
+                    ${d.Cl     !== undefined ? `<tr><td>Lift Coefficient (Cl)</td><td>${d.Cl}</td></tr>` : ""}
+                    ${d.Cd     !== undefined ? `<tr><td>Drag Coefficient (Cd)</td><td>${d.Cd}</td></tr>` : ""}
+                    ${d.Cp     !== undefined ? `<tr><td>Pressure Coefficient (Cp)</td><td>${d.Cp}</td></tr>` : ""}
+                    ${d.wall_shear_stress !== undefined ? `<tr><td>Wall Shear Stress</td><td>${d.wall_shear_stress}</td></tr>` : ""}
+                    ${d.reynolds_number   !== undefined ? `<tr><td>Reynolds Number</td><td>${d.reynolds_number.toLocaleString()}</td></tr>` : ""}
+                </table>
+            `;
+            bubble.appendChild(tableDiv);
+        }
+
+        msg.appendChild(avatar);
+        msg.appendChild(bubble);
+        chatArea.appendChild(msg);
+        chatArea.scrollTop = chatArea.scrollHeight;
+
+        return msg;
+    }
+
+    // ── Format message text ───────────────────────────────────────────────────
+    function formatMessage(text) {
+        return text
+            .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+            .replace(/\*(.*?)\*/g, "<em>$1</em>")
+            .replace(/`(.*?)`/g, "<code style='background:#0f172a;padding:1px 4px;border-radius:3px;font-size:12px'>$1</code>")
+            .replace(/\n/g, "<br>");
+    }
+
+    // ── Show typing indicator ─────────────────────────────────────────────────
+    function showTyping() {
+        const chatArea = document.getElementById("chatArea");
+        const msg = document.createElement("div");
+        msg.className = "message assistant";
+        msg.id = "typing";
+        msg.innerHTML = `
+            <div class="avatar">🤖</div>
+            <div class="bubble">
+                <div class="typing">
+                    <span></span><span></span><span></span>
+                    <span style="margin-left:6px;font-size:12px;color:#64748b">Thinking...</span>
+                </div>
+            </div>`;
+        chatArea.appendChild(msg);
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    function hideTyping() {
+        const t = document.getElementById("typing");
+        if (t) t.remove();
+    }
+
+    // ── Send message ──────────────────────────────────────────────────────────
+    async function sendMessage() {
+        if (isLoading) return;
+
+        const input   = document.getElementById("userInput");
+        const sendBtn = document.getElementById("sendBtn");
+        const message = input.value.trim();
+        if (!message) return;
+
+        // Clear input
+        input.value = "";
+        input.style.height = "auto";
+
+        // Add user message
+        addMessage("user", message);
+
+        // Add to history
+        history.push({ role: "user", content: message });
+
+        // Show loading
+        isLoading = true;
+        sendBtn.disabled = true;
+        showTyping();
+
+        try {
+            const response = await fetch(API_URL, {
+                method : "POST",
+                headers: { "Content-Type": "application/json" },
+                body   : JSON.stringify({
+                    message,
+                    history: history.slice(-10)  // last 10 messages for context
+                })
+            });
+
+            hideTyping();
+
+            if (!response.ok) {
+                const err = await response.text();
+                addMessage("assistant", `Sorry, an error occurred: ${err}`);
+                return;
+            }
+
+            const data = await response.json();
+
+            // Add assistant response
+            addMessage("assistant", data.answer, data.tools_used || [], data.data);
+
+            // Add to history
+            history.push({ role: "assistant", content: data.answer });
+
+        } catch (err) {
+            hideTyping();
+            addMessage("assistant",
+                `Connection error: ${err.message}\n\nNote: The free server may be waking up (takes ~30 seconds). Please try again!`
+            );
+        } finally {
+            isLoading = false;
+            sendBtn.disabled = false;
+            input.focus();
+        }
+    }
+</script>
+</body>
+</html>

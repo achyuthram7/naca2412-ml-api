@@ -15,6 +15,7 @@ import math
 import numpy as np
 import pandas as pd
 import joblib
+from fastapi.responses import FileResponse
 from groq import Groq
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -486,3 +487,6 @@ def health():
         "cfd_rows"    : len(cfd_df) if cfd_df is not None else 0,
         "groq"        : "configured" if os.environ.get("GROQ_API_KEY") else "missing API key"
     }
+@app.get("/ui")
+def chat_ui():
+    return FileResponse("index.html")
