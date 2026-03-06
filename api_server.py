@@ -489,4 +489,5 @@ def health():
     }
 @app.get("/ui")
 def chat_ui():
-    return FileResponse("index.html")
+    html_path = os.path.join(BASE_DIR, "index.html")
+    return FileResponse(html_path)
