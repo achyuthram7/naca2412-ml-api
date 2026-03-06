@@ -15,7 +15,7 @@ import math
 import numpy as np
 import pandas as pd
 import joblib
-import anthropic
+from groq import Groq
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -68,12 +68,11 @@ def startup():
         cfd_df = pd.read_csv(DATA_FILE)
         print(f"Loaded CFD data: {len(cfd_df)} rows")
 
-    # Init Anthropic client
-    # Set ANTHROPIC_API_KEY as environment variable on Render
-    client = anthropic.Anthropic(
-        api_key=os.environ.get("ANTHROPIC_API_KEY", "")
+    # Init Groq client
+    client = Groq(
+        api_key=os.environ.get("GROQ_API_KEY", "")
     )
-    print("Claude client initialized")
+    print("Groq client initialized")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -371,78 +370,74 @@ class ChatResponse(BaseModel):
 async def chat(req: ChatRequest):
     """
     Main intelligent endpoint — ask anything in natural language!
-
-    Examples:
-    - "What is the lift coefficient at 30 m/s and 7 degrees?"
-    - "Show me how Cl changes from -5 to 20 degrees at 40 m/s"
-    - "Compare ML model with actual CFD at 20 m/s, 5 degrees"
-    - "What is the stall angle for NACA 2412?"
-    - "How accurate is the ML model?"
-    - "Explain what wall shear stress means physically"
-    - "What turbulence model was used in the simulations?"
-    - "What is the difference between Cl and Cd?"
+    Powered by Groq (free, fast LLM API).
     """
-    if not client or not os.environ.get("ANTHROPIC_API_KEY"):
+    if not client or not os.environ.get("GROQ_API_KEY"):
         raise HTTPException(status_code=503,
-                            detail="Claude API key not configured")
+                            detail="Groq API key not configured")
 
     # Build message history
     messages = list(req.history) if req.history else []
     messages.append({"role": "user", "content": req.message})
 
-    tools_used  = []
-    tool_data   = {}
+    tools_used = []
+    tool_data  = {}
 
-    # Agentic loop — Claude may call multiple tools
+    # Agentic loop — Groq may call multiple tools
     while True:
-        response = client.messages.create(
-            model      = "claude-sonnet-4-20250514",
-            max_tokens = 2000,
-            system     = SYSTEM_PROMPT,
-            tools      = CLAUDE_TOOLS,
-            messages   = messages
+        response = client.chat.completions.create(
+            model    = "llama-3.3-70b-versatile",   # best free Groq model
+            messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages,
+            tools    = CLAUDE_TOOLS,
+            tool_choice = "auto",
+            max_tokens  = 2000,
         )
 
-        # If Claude wants to use tools
-        if response.stop_reason == "tool_use":
-            tool_results = []
+        msg = response.choices[0].message
 
-            for block in response.content:
-                if block.type == "tool_use":
-                    tool_name   = block.name
-                    tool_input  = block.input
-                    tools_used.append(tool_name)
+        # If Groq wants to use tools
+        if msg.tool_calls:
+            # Add assistant message with tool calls
+            messages.append({
+                "role"      : "assistant",
+                "content"   : msg.content or "",
+                "tool_calls": [
+                    {
+                        "id"      : tc.id,
+                        "type"    : "function",
+                        "function": {
+                            "name"     : tc.function.name,
+                            "arguments": tc.function.arguments
+                        }
+                    }
+                    for tc in msg.tool_calls
+                ]
+            })
 
-                    # Execute the tool
-                    fn     = TOOL_FUNCTIONS.get(tool_name)
-                    result = fn(**tool_input) if fn else {"error": f"Unknown tool: {tool_name}"}
-                    tool_data[tool_name] = result
+            # Execute each tool
+            for tc in msg.tool_calls:
+                tool_name  = tc.function.name
+                tool_input = json.loads(tc.function.arguments)
+                tools_used.append(tool_name)
 
-                    tool_results.append({
-                        "type"       : "tool_result",
-                        "tool_use_id": block.id,
-                        "content"    : json.dumps(result)
-                    })
+                fn     = TOOL_FUNCTIONS.get(tool_name)
+                result = fn(**tool_input) if fn else {"error": f"Unknown tool: {tool_name}"}
+                tool_data[tool_name] = result
 
-            # Add Claude's response and tool results to history
-            messages.append({"role": "assistant", "content": response.content})
-            messages.append({"role": "user",      "content": tool_results})
+                # Add tool result to messages
+                messages.append({
+                    "role"        : "tool",
+                    "tool_call_id": tc.id,
+                    "content"     : json.dumps(result)
+                })
 
-        # Claude has final answer
-        elif response.stop_reason == "end_turn":
-            final_answer = ""
-            for block in response.content:
-                if hasattr(block, "text"):
-                    final_answer += block.text
+        # Groq has final answer
+        else:
             return ChatResponse(
-                answer     = final_answer,
+                answer     = msg.content or "No response generated.",
                 tools_used = tools_used,
                 data       = tool_data if tool_data else None
             )
-        else:
-            break
-
-    raise HTTPException(status_code=500, detail="Unexpected response from Claude")
 
 
 # ── Standard endpoints still available ───────────────────────────────────────
