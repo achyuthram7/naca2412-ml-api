@@ -255,76 +255,100 @@ def tool_get_ml_model_info() -> dict:
 # These tell Claude what tools are available and when to use them
 # ══════════════════════════════════════════════════════════════════════════════
 
-CLAUDE_TOOLS = [
+GROQ_TOOLS = [
     {
-        "name"       : "ml_predict",
-        "description": "Predict Cl, Cd, Cp, wall shear stress using ML surrogate model. Use for any specific velocity + AoA prediction.",
-        "input_schema": {
-            "type"      : "object",
-            "properties": {
-                "velocity_ms": {"type": "number", "description": "Freestream velocity in m/s (10-50)"},
-                "aoa_deg"    : {"type": "number", "description": "Angle of attack in degrees (-5 to 20)"}
-            },
-            "required": ["velocity_ms", "aoa_deg"]
+        "type": "function",
+        "function": {
+            "name"       : "ml_predict",
+            "description": "Predict Cl, Cd, Cp, wall shear stress using ML surrogate model.",
+            "parameters" : {
+                "type"      : "object",
+                "properties": {
+                    "velocity_ms": {"type": "number", "description": "Velocity in m/s (10-50)"},
+                    "aoa_deg"    : {"type": "number", "description": "Angle of attack in degrees (-5 to 20)"}
+                },
+                "required": ["velocity_ms", "aoa_deg"]
+            }
         }
     },
     {
-        "name"       : "cfd_lookup",
-        "description": "Look up actual ANSYS Fluent CFD simulation result. Use when user wants real simulation data or comparison with ML.",
-        "input_schema": {
-            "type"      : "object",
-            "properties": {
-                "velocity_ms": {"type": "number"},
-                "aoa_deg"    : {"type": "number"}
-            },
-            "required": ["velocity_ms", "aoa_deg"]
+        "type": "function",
+        "function": {
+            "name"       : "cfd_lookup",
+            "description": "Look up actual ANSYS Fluent CFD simulation result nearest to requested conditions.",
+            "parameters" : {
+                "type"      : "object",
+                "properties": {
+                    "velocity_ms": {"type": "number"},
+                    "aoa_deg"    : {"type": "number"}
+                },
+                "required": ["velocity_ms", "aoa_deg"]
+            }
         }
     },
     {
-        "name"       : "aoa_sweep",
-        "description": "Generate ML predictions over a range of angles of attack. Use when user asks for a curve, polar, or range of values.",
-        "input_schema": {
-            "type"      : "object",
-            "properties": {
-                "velocity_ms": {"type": "number"},
-                "aoa_start"  : {"type": "number", "default": -5},
-                "aoa_end"    : {"type": "number", "default": 20},
-                "n_points"   : {"type": "integer", "default": 50}
-            },
-            "required": ["velocity_ms"]
+        "type": "function",
+        "function": {
+            "name"       : "aoa_sweep",
+            "description": "Generate ML predictions over a range of angles of attack. Use when user asks for a curve or range.",
+            "parameters" : {
+                "type"      : "object",
+                "properties": {
+                    "velocity_ms": {"type": "number"},
+                    "aoa_start"  : {"type": "number"},
+                    "aoa_end"    : {"type": "number"},
+                    "n_points"   : {"type": "integer"}
+                },
+                "required": ["velocity_ms"]
+            }
         }
     },
     {
-        "name"       : "thin_airfoil_theory",
-        "description": "Calculate using thin airfoil theory analytical formula. Use for comparison or when user asks about theory.",
-        "input_schema": {
-            "type"      : "object",
-            "properties": {
-                "aoa_deg": {"type": "number"}
-            },
-            "required": ["aoa_deg"]
+        "type": "function",
+        "function": {
+            "name"       : "thin_airfoil_theory",
+            "description": "Calculate using thin airfoil theory analytical formula for comparison.",
+            "parameters" : {
+                "type"      : "object",
+                "properties": {
+                    "aoa_deg": {"type": "number"}
+                },
+                "required": ["aoa_deg"]
+            }
         }
     },
     {
-        "name"       : "get_dataset_info",
-        "description": "Get information about the CFD simulation dataset. Use when user asks about training data, simulation settings, or dataset details.",
-        "input_schema": {"type": "object", "properties": {}}
+        "type": "function",
+        "function": {
+            "name"       : "get_dataset_info",
+            "description": "Get information about the CFD simulation dataset and training data.",
+            "parameters" : {
+                "type"      : "object",
+                "properties": {}
+            }
+        }
     },
     {
-        "name"       : "get_ml_model_info",
-        "description": "Get ML model performance metrics and details. Use when user asks about model accuracy, R², or training.",
-        "input_schema": {"type": "object", "properties": {}}
+        "type": "function",
+        "function": {
+            "name"       : "get_ml_model_info",
+            "description": "Get ML model performance metrics, R² scores and accuracy details.",
+            "parameters" : {
+                "type"      : "object",
+                "properties": {}
+            }
+        }
     }
 ]
 
 # Map tool names to functions
 TOOL_FUNCTIONS = {
-    "ml_predict"        : tool_ml_predict,
-    "cfd_lookup"        : tool_cfd_lookup,
-    "aoa_sweep"         : tool_aoa_sweep,
+    "ml_predict"         : tool_ml_predict,
+    "cfd_lookup"         : tool_cfd_lookup,
+    "aoa_sweep"          : tool_aoa_sweep,
     "thin_airfoil_theory": tool_thin_airfoil_theory,
-    "get_dataset_info"  : tool_get_dataset_info,
-    "get_ml_model_info" : tool_get_ml_model_info,
+    "get_dataset_info"   : tool_get_dataset_info,
+    "get_ml_model_info"  : tool_get_ml_model_info,
 }
 
 
@@ -385,7 +409,7 @@ async def chat(req: ChatRequest):
             response = client.chat.completions.create(
                 model       = "llama-3.3-70b-versatile",
                 messages    = [{"role": "system", "content": SYSTEM_PROMPT}] + messages,
-                tools       = CLAUDE_TOOLS,
+                tools       = GROQ_TOOLS,
                 tool_choice = "auto",
                 max_tokens  = 2000,
             )
