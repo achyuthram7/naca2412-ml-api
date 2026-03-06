@@ -368,76 +368,71 @@ class ChatResponse(BaseModel):
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
-    """
-    Main intelligent endpoint — ask anything in natural language!
-    Powered by Groq (free, fast LLM API).
-    """
-    if not client or not os.environ.get("GROQ_API_KEY"):
+    """Main intelligent endpoint — ask anything in natural language!"""
+    if not os.environ.get("GROQ_API_KEY"):
         raise HTTPException(status_code=503,
                             detail="Groq API key not configured")
+    try:
+        # Build message history
+        messages = list(req.history) if req.history else []
+        messages.append({"role": "user", "content": req.message})
 
-    # Build message history
-    messages = list(req.history) if req.history else []
-    messages.append({"role": "user", "content": req.message})
+        tools_used = []
+        tool_data  = {}
 
-    tools_used = []
-    tool_data  = {}
+        # Agentic loop
+        while True:
+            response = client.chat.completions.create(
+                model       = "llama-3.3-70b-versatile",
+                messages    = [{"role": "system", "content": SYSTEM_PROMPT}] + messages,
+                tools       = CLAUDE_TOOLS,
+                tool_choice = "auto",
+                max_tokens  = 2000,
+            )
 
-    # Agentic loop — Groq may call multiple tools
-    while True:
-        response = client.chat.completions.create(
-            model    = "llama-3.3-70b-versatile",   # best free Groq model
-            messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages,
-            tools    = CLAUDE_TOOLS,
-            tool_choice = "auto",
-            max_tokens  = 2000,
-        )
+            msg = response.choices[0].message
 
-        msg = response.choices[0].message
-
-        # If Groq wants to use tools
-        if msg.tool_calls:
-            # Add assistant message with tool calls
-            messages.append({
-                "role"      : "assistant",
-                "content"   : msg.content or "",
-                "tool_calls": [
-                    {
-                        "id"      : tc.id,
-                        "type"    : "function",
-                        "function": {
-                            "name"     : tc.function.name,
-                            "arguments": tc.function.arguments
-                        }
-                    }
-                    for tc in msg.tool_calls
-                ]
-            })
-
-            # Execute each tool
-            for tc in msg.tool_calls:
-                tool_name  = tc.function.name
-                tool_input = json.loads(tc.function.arguments)
-                tools_used.append(tool_name)
-
-                fn     = TOOL_FUNCTIONS.get(tool_name)
-                result = fn(**tool_input) if fn else {"error": f"Unknown tool: {tool_name}"}
-                tool_data[tool_name] = result
-
-                # Add tool result to messages
+            if msg.tool_calls:
                 messages.append({
-                    "role"        : "tool",
-                    "tool_call_id": tc.id,
-                    "content"     : json.dumps(result)
+                    "role"      : "assistant",
+                    "content"   : msg.content or "",
+                    "tool_calls": [
+                        {
+                            "id"      : tc.id,
+                            "type"    : "function",
+                            "function": {
+                                "name"     : tc.function.name,
+                                "arguments": tc.function.arguments
+                            }
+                        }
+                        for tc in msg.tool_calls
+                    ]
                 })
 
-        # Groq has final answer
-        else:
-            return ChatResponse(
-                answer     = msg.content or "No response generated.",
-                tools_used = tools_used,
-                data       = tool_data if tool_data else None
-            )
+                for tc in msg.tool_calls:
+                    tool_name  = tc.function.name
+                    tool_input = json.loads(tc.function.arguments)
+                    tools_used.append(tool_name)
+
+                    fn     = TOOL_FUNCTIONS.get(tool_name)
+                    result = fn(**tool_input) if fn else {"error": f"Unknown tool: {tool_name}"}
+                    tool_data[tool_name] = result
+
+                    messages.append({
+                        "role"        : "tool",
+                        "tool_call_id": tc.id,
+                        "content"     : json.dumps(result)
+                    })
+            else:
+                return ChatResponse(
+                    answer     = msg.content or "No response generated.",
+                    tools_used = tools_used,
+                    data       = tool_data if tool_data else None
+                )
+
+    except Exception as e:
+        # Return actual error message instead of generic 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── Standard endpoints still available ───────────────────────────────────────
