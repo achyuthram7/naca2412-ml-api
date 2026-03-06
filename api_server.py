@@ -465,5 +465,5 @@ def health():
         "status"      : "ok",
         "ml_models"   : list(models.keys()),
         "cfd_rows"    : len(cfd_df) if cfd_df is not None else 0,
-        "claude"      : "configured" if os.environ.get("ANTHROPIC_API_KEY") else "missing API key"
+        "groq"        : "configured" if os.environ.get("GROQ_API_KEY") else "missing API key"
     }
